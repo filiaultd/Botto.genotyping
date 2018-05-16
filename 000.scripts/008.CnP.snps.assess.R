@@ -1,9 +1,12 @@
 ### parse Col and Pat parent SNP set
+### filter line gts for SNPs good in parental data set
 ### quality control and description of SNP numbers and distribution
 ### DLF 08Sept17
 
 setwd("/lustre/scratch/users/daniele.filiault/001.Botto_ColxPat/003.ilka.col.pat.vcf/")
 
+
+#### reads in SNPs called in parental lines
 dat <- read.table("CnP.parents.08Sept17.genotype.table.txt",header=TRUE)
 
 dim(dat)  #524999 variant sites total
@@ -44,17 +47,20 @@ bin.gt$combo <- paste(bin.gt$col, bin.gt$pat, sep="_")
 ###   0_0.5     0_1   0.5_0 0.5_0.5   0.5_1     1_0   1_0.5     1_1 
   73974  444943    2739    1191    1602     120      32     398 
 
+### keep only SNPs that are 0_1 (the expected pattern here)
 bin.gt.g <- bin.gt[bin.gt$combo=="0_1",]  ##444943 SNPs.  Not bad.
 bin.gt.s <- split(bin.gt.g, bin.gt.g$CHROM)
 
 
 ######## how many SNPs per line?
 
+# reads in line SNP data
 line.dat <- read.table("/lustre/scratch/users/daniele.filiault/001.Botto_ColxPat/002.vcfs/colxpat.05Sept17.genotyped.vcf.FILTERED.BIALLELIC.SNP.vcf.genotype.table.txt", header=TRUE, comment.char="",stringsAsFactors=FALSE)  ### 325106 SNPs, 193 lines
 
 sample.index <- cbind(7:193,colnames(line.dat)[7:193])
 colnames(line.dat)[7:193] <- paste("S",7:193,sep="_")
-# filter for SNPs in the good SNP set
+
+# turn these into 0/1 coding
 
 sample.gt <- matrix(NA,nrow=nrow(line.dat),ncol=ncol(line.dat)-6)
 bp.to.bin2 <- function(up.dat){
@@ -74,7 +80,7 @@ bp.to.bin2 <- function(up.dat){
 	return(out.gt)
 }
 
-for(up in 157632:nrow(line.dat)){
+for(up in 1:nrow(line.dat)){
 	#print(up)
 	up.dat <- line.dat[up,]
 	up.gt <- bp.to.bin2(up.dat)
@@ -84,7 +90,7 @@ for(up in 157632:nrow(line.dat)){
 sample.gt <- cbind(line.dat[,1:2], sample.gt)
 sample.gt.s <- split(sample.gt,sample.gt$CHROM)
 
-### remove SNPs not in "good" SNPs
+### remove SNPs not in "good" (i.e. parental) SNPs as determined above
 
 filter.gt.s <- as.list(1:5)
 for(up in 1:5){
@@ -210,7 +216,7 @@ het <- apply(r.sample.gt,1, function(x){
 total <- homr + homa + (0.5*het)
 p.r <- (homr + (0.5*het))/total
 p.a <- (homa + (0.5*het))/total
-p.ar <- p.a/p.r
+p.ar <- p.a/p.r:w
 
 par(mfcol=1,3)
 hist(p.r)
@@ -242,8 +248,9 @@ dev.off()
 write.csv(p.dat.s[[4]],"alt.allele.prop.chromsome.four.csv", quote=FALSE, row.names=FALSE)
 
 ################################################
-### just briefly test an hmm here
-### temporarily output gt variable
+### output gt variable
+### for running HMM
+################################################
 
 save(filter.gt.s, file="filter.gt.s.Rdata")
 

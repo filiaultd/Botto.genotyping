@@ -134,7 +134,7 @@ hmm.gt <- function(line.no, snps){
 
 
 all.gts <- as.list(:(ncol1(snps.no.te.s[[1]])-2))
-for (up.l in 62:(ncol(snps.no.te.s[[1]])-2)){
+for (up.l in c(1:60,62:(ncol(snps.no.te.s[[1]])-2))){
 	print(up.l)
 	l.gts <- hmm.gt(line.no=up.l, snps=snps.no.te.s)
 	all.gts[[up.l]] <- l.gts
