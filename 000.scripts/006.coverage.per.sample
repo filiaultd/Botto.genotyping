@@ -1,0 +1,18 @@
+#!/bin/bash
+
+
+### run bedtools genomecov to get coverage stats for all samples
+### DLF 05Sept17
+
+
+ALL_BAMS=short.realigned.bams.txt
+IN_DIR=/lustre/scratch/users/daniele.filiault/001.Botto_ColxPat/001.outbam
+OUT_DIR=/lustre/scratch/users/daniele.filiault/001.Botto_ColxPat/005.coverage
+
+module load BEDTools
+cd $IN_DIR
+
+while read b; do
+	echo $b
+	bedtools genomecov -ibam $b -g TAIR10_all.genome.file > $OUT_DIR.$b.cov
+done <$ALL_BAMS
