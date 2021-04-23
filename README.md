@@ -7,4 +7,4 @@ Scripts for Botto Col/Pat RIL genotyping
 
 006.hmm.genotyping -> genotype data  
 
-007.sample.index -> generate sample index to link Botto Lab and GMI data
+007.sample.index -> sample index to link Botto Lab and GMI data
