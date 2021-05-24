@@ -1,0 +1,112 @@
+---
+title: "011.map.troubleshooting.Rmd"
+author: "Daniele Filiault"
+date: "5/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+#install.packages("ASMap")
+#install.packages("qtl")
+library(ASMap)
+library(qtl)
+
+#setwd("/Volumes/field_experiments/997.external.collabs/001.Botto_ColxPat/000.scripts/")
+```
+
+## Introduction
+
+The ColxPat genetic map Diego made is 10x longer than expected.  He used the MSTmap online tool.  I am going to try using the R/ASMap package, which uses the same algorithms, but allows for more flexibility and troubleshooting.
+
+Will just try Chr1 first.
+
+
+## 1. Load data
+
+### Change input file to do other chromosomes
+
+```{r load data}
+up.gt.file <- "../008.diego.data/genotypes.chr1.txt" ## formatted correctly from Diego
+up.dat <- read.table(file=up.gt.file, stringsAsFactors=FALSE)
+
+chr1.dat <- mstmap.data.frame(up.dat, pop.type = "RIL6", dist.fun = "kosambi", objective.fun = "COUNT", p.value = 1e-06, noMap.dist = 5, noMap.size = 0, miss.thresh = 1, mvest.bc = FALSE, as.cross = TRUE, return.imputed = FALSE, trace = TRUE)
+
+```
+
+## 2. Assess and remove missing data
+```{r assess missing gts per line}
+plotMissing(chr1.dat)
+
+sg <- statGen(chr1.dat, bychr = FALSE, stat.type = "miss")
+hist(sg$miss)
+
+#let's only keep lines with <10% missing genotypes
+chr1.dat <- subset(chr1.dat, ind = sg$miss < (ncol(up.dat)*0.1)) #140 individuals
+plotMissing(chr1.dat)
+
+```
+There are lines and markers with a large amount of missing data.  According to the ASMap tutorial (https://cran.r-project.org/web/packages/ASMap/vignettes/asmapvignette.pdf), lines with missing data can lead to overestimations of map distances and should be removed from map calculations.  Removed lines with >10% missing data
+
+```{r check markers}
+
+profileMark(chr1.dat, stat.type = c("seg.dist", "prop", "miss","dxo"), crit.val =
+"bonf", layout = c(1, 8), type = "l", cex = 0.5)
+
+# remove markers with high proportion of missing data
+chr1.dat <- pullCross(chr1.dat, type = "missing", pars = list(miss.thresh =
+0.02))
+
+# remove markers with extreme segregation distortion
+gt <- geno.table(chr1.dat)
+gt[-log10(gt$P.value) > 15,] # this cutoff is arbitrary - there is a lot of segregation distortion here and i only want to remove this very badly behaving marker!
+todrop <- rownames(gt[-log10(gt$P.value) > 15,])
+chr1.dat <- drop.markers(chr1.dat, todrop)
+profileMark(chr1.dat, stat.type = c("seg.dist", "prop", "miss","dxo"), crit.val =
+"bonf", layout = c(1, 8), type = "l", cex = 0.5)
+
+```
+So I see some problematic markers here.  Filter for proportion missing, segregation distortion.  This takes care of the markers that are also problematic in other areas.  The amount of double crossovers is also a bit concerning, but ignore for now.  
+
+This is just for chr1 - might be other problems on other chromosomes??  
+
+In any case, marker profiles look much better now.
+
+## 3. make a map for chromsome 1
+
+```{r map chr1}
+
+mapCHR1 <- mstmap(chr1.dat, bychr = FALSE, trace = TRUE, dist.fun ="kosambi", p.value = 1e-12)
+
+chrlen(mapCHR1)
+
+heatMap(mapCHR1)
+
+## check number of crossovers per line
+pg <- profileGen(mapCHR1, bychr = FALSE, stat.type = c("xo", "dxo","miss"), id = "Genotype", xo.lambda = 14, layout = c(1, 3), lty = 2, cex =0.7)
+
+## two lines are excessive.
+test <- subsetCross(mapCHR1, ind = !pg$xo.lambda)
+mapTEST <- mstmap(test, bychr = TRUE, dist.fun = "kosambi", trace = TRUE,p.value = 1e-12)
+chrlen(mapTEST)
+## reduced map length by about 30cm
+
+test.pg <- profileGen(mapTEST, bychr = FALSE, stat.type = c("xo", "dxo","miss"), id = "Genotype", xo.lambda = 14, layout = c(1, 3), lty = 2, cex =0.7)
+hist(test.pg$stat$xo)
+
+```
+
+Rough estimate, number of crossovers per one chromosome (assuming one per arm per generation) would be 4.  
+So here, there are some lines with a lot more, but median is 3, which seems OK?
+
+## 4. Try re-estimating genetic distances
+
+According to the R/ASMap vignette (https://cran.r-project.org/web/packages/ASMap/vignettes/asmapvignette.pdf) p.44-47, missing data can have an oversized effect on calculating mapping distance and they suggest doing a recalculation with quickEst.  (See tutorial for a complete explanation of why this happens)
+
+```{r reestimate distances}
+mapTESTe <- quickEst(mapTEST)
+chrlen(mapTEST)
+chrlen(mapTESTe)
+```
+
+# Much better!!!
